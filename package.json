@@ -1,0 +1,10 @@
+{
+  "name": "cubbes-resource-drive",
+  "version": "1.0.0",
+  "description": "Crowdsourcing platform for academic materials",
+  "private": true,
+  "scripts": {
+    "dev": "python -m http.server 3000",
+    "build": "echo 'Static site, no build needed'"
+  }
+}

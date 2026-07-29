@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cubbes Resource Drive - Upload Materials</title>
+  <meta name="description" content="Share course materials and earn credits." />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
+        <img src="https://cubbes.app/assets/logo.svg" alt="Cubbes" class="brand-logo" />
+        <span class="brand-sep">|</span>
+        <span class="brand-sub">Resource Drive</span>
+      </a>
+      <nav class="header-nav">
+        <a href="/">Upload</a>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/admin">Admin</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div id="content">
+      <p class="muted">Loading…</p>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    function uploadPortalTemplate() {
+      return `
+        <div class="hero-banner">
+          <div class="hero-content">
+            <span class="hero-eyebrow" style="color: var(--brand);">Cubbes Resource Drive</span>
+            <h1>Share Course Materials</h1>
+            <p>Help your peers by uploading course outlines, study materials, and past questions. Earn credits with every approved submission.</p>
+          </div>
+        </div>
+
+        <div class="card" style="max-width:640px; margin:0 auto;">
+          <h2>Upload Material</h2>
+          <form id="uploadForm">
+            <div class="form-group">
+              <label for="university">University <span class="required">*</span></label>
+              <select id="university" name="university" required>
+                <option value="">Select a university...</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="department">Department <span class="required">*</span></label>
+              <select id="department" name="department" required>
+                <option value="">Select a department...</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="courseSearch">Course Code <span class="required">*</span></label>
+              <div style="display:flex; gap:12px; align-items:flex-end;">
+                <div style="flex:1;">
+                  <input type="text" id="courseSearch" name="courseSearch" placeholder="Search by code (e.g., STA 141)" />
+                  <div id="courseDropdown" class="course-dropdown" style="display:none;"></div>
+                </div>
+                <button type="button" id="notFoundToggle" class="btn btn-outline">Not Found?</button>
+              </div>
+            </div>
+
+            <div id="manualCourseFields" style="display:none;">
+              <div class="form-group">
+                <label for="manualCode">Course Code <span class="required">*</span></label>
+                <input type="text" id="manualCode" name="manualCode" placeholder="e.g., STA 141" />
+              </div>
+              <div class="form-group">
+                <label for="manualTitle">Course Title <span class="required">*</span></label>
+                <input type="text" id="manualTitle" name="manualTitle" placeholder="e.g., Probability I" />
+              </div>
+              <div class="form-group">
+                <label for="academicLevel">Academic Level <span class="required">*</span></label>
+                <select id="academicLevel" name="academicLevel" required>
+                  <option value="">Select level...</option>
+                  <option value="100L">100L</option>
+                  <option value="200L">200L</option>
+                  <option value="300L">300L</option>
+                  <option value="400L">400L</option>
+                  <option value="500L">500L</option>
+                </select>
+              </div>
+            </div>
+
+            <input type="hidden" id="courseId" name="courseId" />
+
+            <div class="form-group">
+              <label for="resourceType">Resource Type <span class="required">*</span></label>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input type="radio" name="resourceType" value="OUTLINE" required />
+                  <span>Course Outline</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="resourceType" value="MATERIAL" />
+                  <span>Study Material / Lecture Notes</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="resourceType" value="PAST_QUESTION" />
+                  <span>Past Question</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="contributor">Your Cubbes Tag / Email <span class="required">*</span></label>
+              <input type="text" id="contributor" name="contributor" placeholder="your-tag or email@university.edu" required />
+            </div>
+
+            <div class="form-group">
+              <label>File <span class="required">*</span></label>
+              <div class="file-dropzone" id="fileDropzone">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p><strong>Drag files here or click to upload</strong></p>
+                <p class="muted" style="font-size:13px;">PDF, DOCX, PNG, JPG (max 50MB)</p>
+                <input type="file" id="fileInput" name="file" accept=".pdf,.docx,.png,.jpg,.jpeg" style="display:none;" required />
+              </div>
+              <div id="fileSelected" style="display:none; margin-top:12px; padding:12px; background:var(--green-bg); border-radius:8px; color:var(--green-ink);">
+                <strong id="fileName"></strong> selected
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="legalCheck" name="legalCheck" required />
+                <span>I confirm that I am authorized to share these materials for educational purposes and that this document does not violate any institutional policies or copyright laws.</span>
+              </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submitBtn">Upload & Earn Credits</button>
+          </form>
+        </div>
+      `;
+    }
+
+    async function showUploadPortal() {
+      const content = document.getElementById("content");
+      content.innerHTML = uploadPortalTemplate();
+
+      // Initialize form handlers
+      initializeUploadForm();
+    }
+
+    function initializeUploadForm() {
+      const universitySelect = document.getElementById("university");
+      const departmentSelect = document.getElementById("department");
+      const courseSearch = document.getElementById("courseSearch");
+      const courseDropdown = document.getElementById("courseDropdown");
+      const notFoundToggle = document.getElementById("notFoundToggle");
+      const manualFields = document.getElementById("manualCourseFields");
+      const fileDropzone = document.getElementById("fileDropzone");
+      const fileInput = document.getElementById("fileInput");
+      const fileSelected = document.getElementById("fileSelected");
+      const uploadForm = document.getElementById("uploadForm");
+
+      // Load universities
+      loadUniversities(universitySelect);
+
+      universitySelect.addEventListener("change", () => {
+        departmentSelect.innerHTML = '<option value="">Select a department...</option>';
+        courseSearch.value = "";
+        courseDropdown.style.display = "none";
+        courseSearch.disabled = true;
+
+        if (universitySelect.value) {
+          loadDepartments(universitySelect.value, departmentSelect);
+          courseSearch.disabled = false;
+        }
+      });
+
+      departmentSelect.addEventListener("change", () => {
+        courseSearch.value = "";
+        courseDropdown.style.display = "none";
+      });
+
+      courseSearch.addEventListener("input", debounce(() => {
+        if (!courseSearch.value || !universitySelect.value || !departmentSelect.value) {
+          courseDropdown.style.display = "none";
+          return;
+        }
+        searchCourses(
+          universitySelect.value,
+          departmentSelect.value,
+          courseSearch.value,
+          courseDropdown
+        );
+      }, 300));
+
+      notFoundToggle.addEventListener("click", () => {
+        manualFields.style.display = manualFields.style.display === "none" ? "block" : "none";
+        notFoundToggle.textContent = manualFields.style.display === "none" ? "Not Found?" : "Use Existing Course";
+      });
+
+      // File dropzone
+      fileDropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        fileDropzone.style.borderColor = "var(--brand)";
+        fileDropzone.style.backgroundColor = "var(--brand-soft)";
+      });
+
+      fileDropzone.addEventListener("dragleave", () => {
+        fileDropzone.style.borderColor = "";
+        fileDropzone.style.backgroundColor = "";
+      });
+
+      fileDropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        fileDropzone.style.borderColor = "";
+        fileDropzone.style.backgroundColor = "";
+        fileInput.files = e.dataTransfer.files;
+        updateFileDisplay();
+      });
+
+      fileDropzone.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", updateFileDisplay);
+
+      function updateFileDisplay() {
+        if (fileInput.files.length > 0) {
+          document.getElementById("fileName").textContent = fileInput.files[0].name;
+          fileSelected.style.display = "block";
+          fileDropzone.style.display = "none";
+        }
+      }
+
+      uploadForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById("submitBtn");
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Uploading…";
+
+        try {
+          const formData = new FormData(uploadForm);
+          const file = fileInput.files[0];
+
+          if (!file) throw new Error("Please select a file");
+          if (file.size > 50 * 1024 * 1024) throw new Error("File is too large (max 50MB)");
+
+          // Read file as base64
+          const reader = new FileReader();
+          reader.onload = async () => {
+            try {
+              const result = await submitUpload({
+                university: formData.get("university"),
+                department: formData.get("department"),
+                courseId: document.getElementById("courseId").value,
+                manualCode: formData.get("manualCode"),
+                manualTitle: formData.get("manualTitle"),
+                academicLevel: formData.get("academicLevel"),
+                resourceType: formData.get("resourceType"),
+                contributor: formData.get("contributor"),
+                fileName: file.name,
+                fileData: reader.result.split(",")[1], // base64 without data:image/...;base64, prefix
+              });
+
+              if (result.error) {
+                showToast(result.error, true);
+              } else {
+                showToast("Upload successful! Your submission is pending review.", false);
+                uploadForm.reset();
+                fileSelected.style.display = "none";
+                fileDropzone.style.display = "block";
+                manualFields.style.display = "none";
+              }
+            } catch (err) {
+              showToast("Upload failed: " + err.message, true);
+            } finally {
+              submitBtn.disabled = false;
+              submitBtn.textContent = "Upload & Earn Credits";
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (err) {
+          showToast("Error: " + err.message, true);
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Upload & Earn Credits";
+        }
+      });
+    }
+
+    async function render() {
+      const content = document.getElementById("content");
+      if (configIsMissing()) {
+        content.innerHTML = `<p class="muted">Set <code>APPS_SCRIPT_URL</code> in config.js to connect this page to your Google Sheet.</p>`;
+        return;
+      }
+
+      showUploadPortal();
+    }
+
+    render();
+  </script>
+</body>
+</html>

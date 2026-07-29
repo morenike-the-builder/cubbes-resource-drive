@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Leaderboard - Cubbes Resource Drive</title>
+  <meta name="description" content="Top contributors leaderboard." />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
+        <img src="https://cubbes.app/assets/logo.svg" alt="Cubbes" class="brand-logo" />
+        <span class="brand-sep">|</span>
+        <span class="brand-sub">Resource Drive</span>
+      </a>
+      <nav class="header-nav">
+        <a href="/">Upload</a>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/admin">Admin</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div id="content">
+      <p class="muted">Loading…</p>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    function leaderboardTemplate(entries, filter) {
+      const filterHTML = `
+        <div class="filter-tabs">
+          <button class="filter-tab ${filter === "alltime" ? "active" : ""}" data-filter="alltime">All Time</button>
+          <button class="filter-tab ${filter === "monthly" ? "active" : ""}" data-filter="monthly">This Month</button>
+        </div>
+      `;
+
+      const tableHTML = entries.length
+        ? `
+          <div class="leaderboard-table">
+            <div class="leaderboard-header">
+              <div class="col-rank">Rank</div>
+              <div class="col-user">Student/User</div>
+              <div class="col-uploads">Approved Uploads</div>
+              <div class="col-credits">Credits Earned</div>
+            </div>
+            ${entries.map((entry, idx) => `
+              <div class="leaderboard-row">
+                <div class="col-rank">
+                  ${idx < 3 ? `<span class="medal">${["🥇", "🥈", "🥉"][idx]}</span>` : `<span class="rank-number">#${idx + 1}</span>`}
+                </div>
+                <div class="col-user">
+                  <div class="user-tag">${escapeHtml(entry.userTag)}</div>
+                </div>
+                <div class="col-uploads">
+                  <strong>${entry.approvedCount}</strong>
+                </div>
+                <div class="col-credits">
+                  <strong>${entry.totalCredits}</strong> pts
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `
+        : `<p class="muted" style="text-align:center; padding:40px;">No submissions yet.</p>`;
+
+      return `
+        <div class="hero-banner">
+          <div class="hero-content">
+            <span class="hero-eyebrow" style="color: var(--brand);">Cubbes Resource Drive</span>
+            <h1>Top Contributors</h1>
+            <p>See who's helping the most students by sharing quality course materials.</p>
+          </div>
+        </div>
+
+        ${filterHTML}
+
+        ${tableHTML}
+      `;
+    }
+
+    async function showLeaderboard() {
+      const content = document.getElementById("content");
+      let filter = localStorage.getItem("leaderboard_filter") || "alltime";
+
+      async function render() {
+        const result = await getLeaderboard(filter);
+        content.innerHTML = leaderboardTemplate(result.entries, filter);
+
+        document.querySelectorAll(".filter-tab").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            filter = btn.getAttribute("data-filter");
+            localStorage.setItem("leaderboard_filter", filter);
+            render();
+          });
+        });
+      }
+
+      await render();
+    }
+
+    async function render() {
+      const content = document.getElementById("content");
+      if (configIsMissing()) {
+        content.innerHTML = `<p class="muted">Set <code>APPS_SCRIPT_URL</code> in config.js to connect this page.</p>`;
+        return;
+      }
+
+      showLeaderboard();
+    }
+
+    render();
+  </script>
+</body>
+</html>

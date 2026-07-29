@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Review - Cubbes Resource Drive</title>
+  <meta name="description" content="Review and approve submissions." />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
+        <img src="https://cubbes.app/assets/logo.svg" alt="Cubbes" class="brand-logo" />
+        <span class="brand-sep">|</span>
+        <span class="brand-sub">Resource Drive</span>
+      </a>
+      <nav class="header-nav">
+        <a href="/">Upload</a>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/admin">Admin</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div id="content">
+      <p class="muted">Loading…</p>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    function adminGateTemplate(errorMessage) {
+      return `
+        <div class="gate-wrapper">
+          <div class="card gate-card" style="max-width:480px;">
+            <h2>Admin Access</h2>
+            <p class="muted lede">Enter your admin PIN to access the review dashboard.</p>
+            <form id="adminGateForm">
+              <div class="field">
+                <label for="adminPin">Admin PIN</label>
+                <input id="adminPin" name="adminPin" type="password" placeholder="••••" required />
+              </div>
+              <button class="btn" type="submit" id="adminGateBtn">Access Dashboard</button>
+            </form>
+            ${errorMessage ? `<p class="muted" style="color:#b91c1c; margin-top:12px;">${escapeHtml(errorMessage)}</p>` : ""}
+          </div>
+        </div>
+      `;
+    }
+
+    function reviewQueueTemplate(submissions, allCourses) {
+      if (submissions.length === 0) {
+        return `
+          <div class="hero-banner">
+            <div class="hero-content">
+              <h1>Review Queue</h1>
+            </div>
+          </div>
+          <p class="muted" style="text-align:center; padding:40px;">No pending submissions to review.</p>
+        `;
+      }
+
+      const current = submissions[0];
+      const remaining = submissions.length - 1;
+
+      return `
+        <div class="hero-banner">
+          <div class="hero-content">
+            <h1>Review Submissions</h1>
+            <p>${remaining} pending (${submissions.length} total including this one)</p>
+          </div>
+        </div>
+
+        <div class="review-container">
+          <div class="review-left">
+            <div id="fileViewer" class="file-viewer">
+              ${current.fileUrl ? `
+                <iframe src="${current.fileUrl}#toolbar=0" style="width:100%; height:100%; border:none;"></iframe>
+              ` : `
+                <div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--muted);">
+                  File not available for preview
+                </div>
+              `}
+            </div>
+          </div>
+
+          <div class="review-right">
+            <div class="review-card">
+              <h3>Submission Details</h3>
+              <dl class="detail-list">
+                <dt>Contributor</dt>
+                <dd>${escapeHtml(current.uploadedBy)}</dd>
+
+                <dt>University</dt>
+                <dd>${escapeHtml(current.university)}</dd>
+
+                <dt>Department</dt>
+                <dd>${escapeHtml(current.department)}</dd>
+
+                <dt>Course</dt>
+                <dd>${escapeHtml(current.courseCode)} - ${escapeHtml(current.courseTitle)}</dd>
+
+                <dt>Resource Type</dt>
+                <dd>${current.type}</dd>
+
+                <dt>File</dt>
+                <dd class="muted">${escapeHtml(current.fileName)}</dd>
+
+                <dt>Submitted</dt>
+                <dd class="muted">${new Date(current.createdAt).toLocaleDateString()}</dd>
+              </dl>
+
+              <h4 style="margin-top:20px;">Re-assign Course (if incorrect)</h4>
+              <div class="form-group">
+                <input type="text" id="courseReassign" placeholder="Search course to reassign..." />
+                <div id="reassignDropdown" class="course-dropdown" style="display:none;"></div>
+              </div>
+
+              <h4 style="margin-top:20px;">Actions</h4>
+              <div class="action-buttons">
+                <button class="btn btn-success" id="approveBtn">✓ Approve & Release Credit</button>
+                <button class="btn btn-outline" id="rejectBtn">✗ Reject</button>
+                <button class="btn btn-danger" id="flagBtn">🚩 Flag Account</button>
+              </div>
+
+              <div id="rejectForm" style="display:none; margin-top:20px; padding:20px; background:var(--red-bg); border-radius:8px;">
+                <label style="display:block; margin-bottom:12px;">
+                  <strong style="color:var(--red-ink);">Rejection Reason</strong>
+                </label>
+                <select id="rejectionReason" style="width:100%; margin-bottom:12px;">
+                  <option value="">Select a reason...</option>
+                  <option value="DUPLICATE">Duplicate File</option>
+                  <option value="UNREADABLE">Unreadable / Poor Quality</option>
+                  <option value="INCORRECT">Incorrect / Non-Academic File</option>
+                  <option value="INCOMPLETE">Incomplete Document</option>
+                </select>
+                <div style="display:flex; gap:12px;">
+                  <button class="btn btn-outline" id="confirmRejectBtn">Confirm Reject</button>
+                  <button class="btn btn-outline" id="cancelRejectBtn">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function showAdminGate(errorMessage) {
+      const content = document.getElementById("content");
+      content.innerHTML = adminGateTemplate(errorMessage);
+
+      document.getElementById("adminGateForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const pin = document.getElementById("adminPin").value.trim();
+        const btn = document.getElementById("adminGateBtn");
+
+        btn.disabled = true;
+        btn.textContent = "Checking…";
+
+        try {
+          const result = await verifyAdminPin(pin);
+          if (!result.authorized) {
+            showAdminGate("Invalid PIN. Try again.");
+            return;
+          }
+          localStorage.setItem("admin_pin", pin);
+          showReviewQueue();
+        } catch (err) {
+          showAdminGate("Error: " + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Access Dashboard";
+        }
+      });
+    }
+
+    async function showReviewQueue() {
+      const content = document.getElementById("content");
+      const result = await getPendingSubmissions();
+      const allCourses = await getAllCourses();
+
+      if (!result.submissions || result.submissions.length === 0) {
+        content.innerHTML = reviewQueueTemplate([], allCourses.courses || []);
+        return;
+      }
+
+      function renderQueue() {
+        content.innerHTML = reviewQueueTemplate(result.submissions, allCourses.courses || []);
+        const current = result.submissions[0];
+
+        // Course reassignment search
+        const courseReassign = document.getElementById("courseReassign");
+        const reassignDropdown = document.getElementById("reassignDropdown");
+
+        courseReassign?.addEventListener("input", debounce(() => {
+          if (courseReassign.value.length < 2) {
+            reassignDropdown.style.display = "none";
+            return;
+          }
+          const filtered = (allCourses.courses || []).filter(c =>
+            `${c.code} - ${c.title}`.toLowerCase().includes(courseReassign.value.toLowerCase())
+          );
+          if (filtered.length > 0) {
+            reassignDropdown.innerHTML = filtered.slice(0, 5).map(c => `
+              <div class="course-option" data-id="${c.id}">
+                ${escapeHtml(c.code)} - ${escapeHtml(c.title)}
+              </div>
+            `).join("");
+            reassignDropdown.style.display = "block";
+
+            document.querySelectorAll(".course-option").forEach(opt => {
+              opt.addEventListener("click", () => {
+                courseReassign.value = `${opt.textContent}`;
+                document.getElementById("courseId").value = opt.getAttribute("data-id");
+                reassignDropdown.style.display = "none";
+              });
+            });
+          }
+        }, 300));
+
+        // Action buttons
+        document.getElementById("approveBtn")?.addEventListener("click", async () => {
+          if (confirm("Approve this submission and release credit?")) {
+            try {
+              const reassignedId = document.getElementById("courseId")?.value;
+              await approveSubmission(current.id, reassignedId || current.courseId);
+              showToast("Submission approved and credit released.", false);
+              result.submissions.shift();
+              renderQueue();
+            } catch (err) {
+              showToast("Error: " + err.message, true);
+            }
+          }
+        });
+
+        document.getElementById("rejectBtn")?.addEventListener("click", () => {
+          document.getElementById("rejectForm").style.display = "block";
+        });
+
+        document.getElementById("cancelRejectBtn")?.addEventListener("click", () => {
+          document.getElementById("rejectForm").style.display = "none";
+        });
+
+        document.getElementById("confirmRejectBtn")?.addEventListener("click", async () => {
+          const reason = document.getElementById("rejectionReason").value;
+          if (!reason) {
+            showToast("Please select a reason.", true);
+            return;
+          }
+          try {
+            await rejectSubmission(current.id, reason);
+            showToast("Submission rejected.", false);
+            result.submissions.shift();
+            renderQueue();
+          } catch (err) {
+            showToast("Error: " + err.message, true);
+          }
+        });
+
+        document.getElementById("flagBtn")?.addEventListener("click", async () => {
+          if (confirm("Flag this account for abuse?")) {
+            try {
+              await flagAccount(current.uploadedBy);
+              showToast("Account flagged.", false);
+              result.submissions.shift();
+              renderQueue();
+            } catch (err) {
+              showToast("Error: " + err.message, true);
+            }
+          }
+        });
+      }
+
+      renderQueue();
+    }
+
+    async function render() {
+      const content = document.getElementById("content");
+      if (configIsMissing()) {
+        content.innerHTML = `<p class="muted">Set <code>APPS_SCRIPT_URL</code> in config.js to connect.</p>`;
+        return;
+      }
+
+      const storedPin = localStorage.getItem("admin_pin");
+      if (!storedPin) {
+        showAdminGate();
+        return;
+      }
+
+      try {
+        const result = await verifyAdminPin(storedPin);
+        if (!result.authorized) {
+          localStorage.removeItem("admin_pin");
+          showAdminGate();
+          return;
+        }
+        showReviewQueue();
+      } catch (err) {
+        showAdminGate();
+      }
+    }
+
+    render();
+  </script>
+</body>
+</html>
