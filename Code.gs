@@ -77,7 +77,8 @@ function getSheet(name) {
 function initializeSheets() {
   // Universities
   let sheet = getSheet("Universities");
-  if (sheet.getLastRow() === 0) {
+  if (sheet.getLastRow() <= 1) {
+    sheet.clear();
     sheet.appendRow(["id", "name", "code"]);
     sheet.appendRow(["uni-1", "University of Lagos", "UNILAG"]);
     sheet.appendRow(["uni-2", "University of Ibadan", "UI"]);
@@ -86,7 +87,8 @@ function initializeSheets() {
 
   // Departments
   sheet = getSheet("Departments");
-  if (sheet.getLastRow() === 0) {
+  if (sheet.getLastRow() <= 1) {
+    sheet.clear();
     sheet.appendRow(["id", "universityId", "name"]);
     sheet.appendRow(["dept-1", "uni-1", "Computer Science"]);
     sheet.appendRow(["dept-2", "uni-1", "Mathematics"]);
@@ -95,7 +97,8 @@ function initializeSheets() {
 
   // Courses
   sheet = getSheet("Courses");
-  if (sheet.getLastRow() === 0) {
+  if (sheet.getLastRow() <= 1) {
+    sheet.clear();
     sheet.appendRow(["id", "code", "title", "level", "universityId", "departmentId", "createdAt"]);
     sheet.appendRow(["course-1", "STA 141", "Probability I", "100L", "uni-1", "dept-2", new Date().toISOString()]);
     sheet.appendRow(["course-2", "STA 241", "Probability II", "200L", "uni-1", "dept-2", new Date().toISOString()]);
@@ -103,19 +106,22 @@ function initializeSheets() {
 
   // Materials (submissions)
   sheet = getSheet("Materials");
-  if (sheet.getLastRow() === 0) {
+  if (sheet.getLastRow() <= 1) {
+    sheet.clear();
     sheet.appendRow(["id", "courseId", "fileUrl", "fileName", "type", "status", "uploadedBy", "reviewedBy", "rejectionReason", "createdAt", "updatedAt"]);
   }
 
   // Leaderboard Cache
   sheet = getSheet("Leaderboard");
-  if (sheet.getLastRow() === 0) {
+  if (sheet.getLastRow() <= 1) {
+    sheet.clear();
     sheet.appendRow(["userTag", "approvedCount", "totalCredits", "lastUpdated"]);
   }
 
   // Flagged Accounts
   sheet = getSheet("FlaggedAccounts");
-  if (sheet.getLastRow() === 0) {
+  if (sheet.getLastRow() <= 1) {
+    sheet.clear();
     sheet.appendRow(["userTag", "flaggedAt", "reason"]);
   }
 }
