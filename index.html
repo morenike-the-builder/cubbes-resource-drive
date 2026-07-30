@@ -222,7 +222,7 @@
       const fileList = document.getElementById("fileList");
       const fileItems = document.getElementById("fileItems");
       const clearFilesBtn = document.getElementById("clearFilesBtn");
-      const dataTransfer = new DataTransfer();
+      let dataTransfer = new DataTransfer();
 
       fileDropzone.addEventListener("dragover", (e) => {
         e.preventDefault();
@@ -349,7 +349,8 @@
               if (successCount === uploadCount) {
                 showToast(`${successCount} file(s) uploaded successfully!`, false);
                 uploadForm.reset();
-                dataTransfer.clearData();
+                dataTransfer = new DataTransfer();
+                fileInput.value = "";
                 updateFileDisplay();
                 manualFields.style.display = "none";
                 document.getElementById("submitBtn").disabled = true;
