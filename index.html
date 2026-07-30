@@ -96,7 +96,7 @@
             <input type="hidden" id="courseId" name="courseId" />
 
             <div class="form-group">
-              <label for="resourceType">Resource Type <span class="required">*</span></label>
+              <label>Resource Type <span class="required">*</span></label>
               <div class="radio-group">
                 <label class="radio-label">
                   <input type="radio" name="resourceType" value="OUTLINE" required />
@@ -119,7 +119,7 @@
             </div>
 
             <div class="form-group">
-              <label>File <span class="required">*</span></label>
+              <label>Files <span class="required">*</span></label>
               <div class="file-dropzone" id="fileDropzone">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -127,22 +127,23 @@
                   <line x1="12" y1="3" x2="12" y2="15"></line>
                 </svg>
                 <p><strong>Drag files here or click to upload</strong></p>
-                <p class="muted" style="font-size:13px;">PDF, DOCX, PNG, JPG (max 50MB)</p>
-                <input type="file" id="fileInput" name="file" accept=".pdf,.docx,.png,.jpg,.jpeg" style="display:none;" required />
+                <p class="muted" style="font-size:13px;">PDF, DOCX, PNG, JPG (max 50MB each)</p>
+                <input type="file" id="fileInput" name="file" accept=".pdf,.docx,.png,.jpg,.jpeg" multiple style="display:none;" />
               </div>
-              <div id="fileSelected" style="display:none; margin-top:12px; padding:12px; background:var(--green-bg); border-radius:8px; color:var(--green-ink);">
-                <strong id="fileName"></strong> selected
+              <div id="fileList" style="display:none; margin-top:12px;">
+                <div id="fileItems"></div>
+                <button type="button" id="clearFilesBtn" class="btn btn-outline" style="margin-top:8px;">Clear All</button>
               </div>
             </div>
 
             <div class="form-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="legalCheck" name="legalCheck" required />
+              <label class="checkbox-label-inline">
+                <input type="checkbox" id="legalCheck" name="legalCheck" />
                 <span>I confirm that I am authorized to share these materials for educational purposes and that this document does not violate any institutional policies or copyright laws.</span>
               </label>
             </div>
 
-            <button type="submit" class="btn btn-primary" id="submitBtn">Upload & Earn Credits</button>
+            <button type="submit" class="btn btn-primary" id="submitBtn" disabled>Upload & Earn Credits</button>
           </form>
         </div>
       `;
@@ -218,6 +219,11 @@
       });
 
       // File dropzone
+      const fileList = document.getElementById("fileList");
+      const fileItems = document.getElementById("fileItems");
+      const clearFilesBtn = document.getElementById("clearFilesBtn");
+      const dataTransfer = new DataTransfer();
+
       fileDropzone.addEventListener("dragover", (e) => {
         e.preventDefault();
         fileDropzone.style.borderColor = "var(--brand)";
@@ -233,20 +239,63 @@
         e.preventDefault();
         fileDropzone.style.borderColor = "";
         fileDropzone.style.backgroundColor = "";
-        fileInput.files = e.dataTransfer.files;
-        updateFileDisplay();
+        Array.from(e.dataTransfer.files).forEach(file => addFile(file));
       });
 
       fileDropzone.addEventListener("click", () => fileInput.click());
-      fileInput.addEventListener("change", updateFileDisplay);
+      fileInput.addEventListener("change", () => {
+        Array.from(fileInput.files).forEach(file => addFile(file));
+        fileInput.value = "";
+      });
+
+      function addFile(file) {
+        if (file.size > 50 * 1024 * 1024) {
+          showToast(`${file.name} is too large (max 50MB)`, true);
+          return;
+        }
+        dataTransfer.items.add(file);
+        updateFileDisplay();
+      }
 
       function updateFileDisplay() {
-        if (fileInput.files.length > 0) {
-          document.getElementById("fileName").textContent = fileInput.files[0].name;
-          fileSelected.style.display = "block";
+        if (dataTransfer.items.length > 0) {
+          fileItems.innerHTML = Array.from(dataTransfer.items).map((item, idx) => `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:var(--green-bg); border-radius:6px; margin-bottom:8px; color:var(--green-ink);">
+              <div>
+                <strong>${escapeHtml(item.getAsFile().name)}</strong>
+                <span style="font-size:12px; margin-left:8px;">(${(item.getAsFile().size / 1024 / 1024).toFixed(2)} MB)</span>
+              </div>
+              <button type="button" class="remove-file" data-index="${idx}" style="background:none; border:none; color:inherit; cursor:pointer; font-weight:bold;">✕</button>
+            </div>
+          `).join("");
+
+          document.querySelectorAll(".remove-file").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+              e.preventDefault();
+              const idx = parseInt(btn.getAttribute("data-index"));
+              dataTransfer.items.remove(idx);
+              updateFileDisplay();
+            });
+          });
+
+          fileList.style.display = "block";
           fileDropzone.style.display = "none";
+        } else {
+          fileList.style.display = "none";
+          fileDropzone.style.display = "block";
         }
       }
+
+      clearFilesBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        dataTransfer.clearData();
+        updateFileDisplay();
+      });
+
+      // Enable/disable submit button based on checkbox
+      document.getElementById("legalCheck").addEventListener("change", () => {
+        document.getElementById("submitBtn").disabled = !document.getElementById("legalCheck").checked;
+      });
 
       uploadForm.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -255,11 +304,8 @@
         submitBtn.textContent = "Uploading…";
 
         try {
-          const formData = new FormData(uploadForm);
-          const file = fileInput.files[0];
-
-          if (!file) throw new Error("Please select a file");
-          if (file.size > 50 * 1024 * 1024) throw new Error("File is too large (max 50MB)");
+          if (dataTransfer.items.length === 0) throw new Error("Please select at least one file");
+          if (!document.getElementById("legalCheck").checked) throw new Error("Please confirm authorization");
 
           // Validate manual course fields if visible
           if (manualFields.style.display !== "none") {
@@ -270,43 +316,51 @@
             if (!document.getElementById("courseId").value) throw new Error("Please select or create a course");
           }
 
-          // Read file as base64
-          const reader = new FileReader();
-          reader.onload = async () => {
-            try {
-              const result = await submitUpload({
-                university: formData.get("university"),
-                department: formData.get("department"),
-                courseId: document.getElementById("courseId").value,
-                manualCode: formData.get("manualCode"),
-                manualTitle: formData.get("manualTitle"),
-                academicLevel: formData.get("academicLevel"),
-                resourceType: formData.get("resourceType"),
-                contributor: formData.get("contributor"),
-                fileName: file.name,
-                fileData: reader.result.split(",")[1], // base64 without data:image/...;base64, prefix
-              });
+          // Upload each file
+          const uploadCount = dataTransfer.items.length;
+          let successCount = 0;
 
-              if (result.error) {
-                showToast(result.error, true);
-              } else {
-                showToast("Upload successful! Your submission is pending review.", false);
-                uploadForm.reset();
-                fileSelected.style.display = "none";
-                fileDropzone.style.display = "block";
-                manualFields.style.display = "none";
+          for (let i = 0; i < dataTransfer.items.length; i++) {
+            const file = dataTransfer.items[i].getAsFile();
+
+            const reader = new FileReader();
+            reader.onload = async () => {
+              try {
+                const result = await submitUpload({
+                  university: document.getElementById("university").value,
+                  department: document.getElementById("department").value,
+                  courseId: document.getElementById("courseId").value,
+                  manualCode: document.getElementById("manualCode").value,
+                  manualTitle: document.getElementById("manualTitle").value,
+                  academicLevel: document.getElementById("academicLevel").value,
+                  resourceType: document.getElementById("uploadForm").querySelector('input[name="resourceType"]:checked').value,
+                  contributor: document.getElementById("contributor").value,
+                  fileName: file.name,
+                  fileData: reader.result.split(",")[1],
+                });
+
+                if (!result.error) {
+                  successCount++;
+                }
+              } catch (err) {
+                console.error("Upload error:", err);
               }
-            } catch (err) {
-              showToast("Upload failed: " + err.message, true);
-            } finally {
-              submitBtn.disabled = false;
-              submitBtn.textContent = "Upload & Earn Credits";
-            }
-          };
-          reader.readAsDataURL(file);
+
+              if (successCount === uploadCount) {
+                showToast(`${successCount} file(s) uploaded successfully!`, false);
+                uploadForm.reset();
+                dataTransfer.clearData();
+                updateFileDisplay();
+                manualFields.style.display = "none";
+                document.getElementById("submitBtn").disabled = true;
+                submitBtn.textContent = "Upload & Earn Credits";
+              }
+            };
+            reader.readAsDataURL(file);
+          }
         } catch (err) {
           showToast("Error: " + err.message, true);
-          submitBtn.disabled = false;
+          submitBtn.disabled = !document.getElementById("legalCheck").checked;
           submitBtn.textContent = "Upload & Earn Credits";
         }
       });
