@@ -224,10 +224,11 @@
 
     async function showReviewQueue() {
       const content = document.getElementById("content");
-      const result = await getPendingSubmissions();
+      let result = await getPendingSubmissions();
       const allCourses = await getAllCourses();
 
-      function renderQueue() {
+      async function renderQueue() {
+        result = await getPendingSubmissions();
         content.innerHTML = reviewQueueTemplate(result.submissions, allCourses.courses || []);
 
         // Table row click handlers
