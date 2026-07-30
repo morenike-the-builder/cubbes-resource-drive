@@ -53,94 +53,138 @@
     }
 
     function reviewQueueTemplate(submissions, allCourses) {
-      if (submissions.length === 0) {
-        return `
-          <div class="hero-banner">
-            <div class="hero-content">
-              <h1>Review Queue</h1>
-            </div>
-          </div>
-          <p class="muted" style="text-align:center; padding:40px;">No pending submissions to review.</p>
-        `;
-      }
+      const stats = {
+        total: submissions.length,
+        approved: submissions.filter(s => s.status === "APPROVED").length,
+        rejected: submissions.filter(s => s.status === "REJECTED").length,
+        pending: submissions.filter(s => s.status === "PENDING").length,
+      };
 
-      const current = submissions[0];
-      const remaining = submissions.length - 1;
+      const tableHTML = submissions.length
+        ? `
+          <div class="submissions-table">
+            <div class="table-header">
+              <div class="col-contributor">Contributor</div>
+              <div class="col-course">Course</div>
+              <div class="col-type">Type</div>
+              <div class="col-submitted">Submitted</div>
+              <div class="col-status">Status</div>
+              <div class="col-action">Action</div>
+            </div>
+            ${submissions.map((sub, idx) => {
+              const statusClass = sub.status.toLowerCase();
+              return `
+                <div class="table-row" data-index="${idx}">
+                  <div class="col-contributor">${escapeHtml(sub.uploadedBy)}</div>
+                  <div class="col-course">${escapeHtml(sub.courseCode)} - ${escapeHtml(sub.courseTitle)}</div>
+                  <div class="col-type">${sub.type}</div>
+                  <div class="col-submitted">${new Date(sub.createdAt).toLocaleDateString()}</div>
+                  <div class="col-status"><span class="status-badge status-${statusClass}">${sub.status}</span></div>
+                  <div class="col-action">
+                    <button class="btn-small review-btn" data-index="${idx}">Review</button>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        `
+        : `<p class="muted" style="text-align:center; padding:40px;">No submissions yet.</p>`;
 
       return `
         <div class="hero-banner">
           <div class="hero-content">
-            <h1>Review Submissions</h1>
-            <p>${remaining} pending (${submissions.length} total including this one)</p>
+            <h1>Submissions Dashboard</h1>
+            <p>Review and approve course materials</p>
           </div>
         </div>
 
-        <div class="review-container">
-          <div class="review-left">
-            <div id="fileViewer" class="file-viewer">
-              ${current.fileUrl ? `
-                <iframe src="${current.fileUrl}#toolbar=0" style="width:100%; height:100%; border:none;"></iframe>
-              ` : `
-                <div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--muted);">
-                  File not available for preview
-                </div>
-              `}
-            </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number">${stats.total}</div>
+            <div class="stat-label">Total Submissions</div>
           </div>
+          <div class="stat-card stat-pending">
+            <div class="stat-number">${stats.pending}</div>
+            <div class="stat-label">Pending Review</div>
+          </div>
+          <div class="stat-card stat-approved">
+            <div class="stat-number">${stats.approved}</div>
+            <div class="stat-label">Approved</div>
+          </div>
+          <div class="stat-card stat-rejected">
+            <div class="stat-number">${stats.rejected}</div>
+            <div class="stat-label">Rejected</div>
+          </div>
+        </div>
 
-          <div class="review-right">
-            <div class="review-card">
-              <h3>Submission Details</h3>
-              <dl class="detail-list">
-                <dt>Contributor</dt>
-                <dd>${escapeHtml(current.uploadedBy)}</dd>
+        ${tableHTML}
 
-                <dt>University</dt>
-                <dd>${escapeHtml(current.university)}</dd>
+        <div id="reviewModal" class="modal" style="display:none;">
+          <div class="modal-overlay"></div>
+          <div class="modal-content">
+            <button class="modal-close" id="closeReviewBtn">✕</button>
 
-                <dt>Department</dt>
-                <dd>${escapeHtml(current.department)}</dd>
+            <div class="modal-body">
+              <div class="review-container-modal">
+                <div class="review-left-modal">
+                  <h3 style="margin-top:0;">File Preview</h3>
+                  <div id="fileViewer" class="file-viewer"></div>
+                </div>
 
-                <dt>Course</dt>
-                <dd>${escapeHtml(current.courseCode)} - ${escapeHtml(current.courseTitle)}</dd>
+                <div class="review-right-modal">
+                  <h3 style="margin-top:0;">Submission Details</h3>
+                  <dl class="detail-list">
+                    <dt>Contributor</dt>
+                    <dd id="detail-contributor"></dd>
 
-                <dt>Resource Type</dt>
-                <dd>${current.type}</dd>
+                    <dt>University</dt>
+                    <dd id="detail-university"></dd>
 
-                <dt>File</dt>
-                <dd class="muted">${escapeHtml(current.fileName)}</dd>
+                    <dt>Department</dt>
+                    <dd id="detail-department"></dd>
 
-                <dt>Submitted</dt>
-                <dd class="muted">${new Date(current.createdAt).toLocaleDateString()}</dd>
-              </dl>
+                    <dt>Course</dt>
+                    <dd id="detail-course"></dd>
 
-              <h4 style="margin-top:20px;">Re-assign Course (if incorrect)</h4>
-              <div class="form-group">
-                <input type="text" id="courseReassign" placeholder="Search course to reassign..." />
-                <div id="reassignDropdown" class="course-dropdown" style="display:none;"></div>
-              </div>
+                    <dt>Resource Type</dt>
+                    <dd id="detail-type"></dd>
 
-              <h4 style="margin-top:20px;">Actions</h4>
-              <div class="action-buttons">
-                <button class="btn btn-success" id="approveBtn">✓ Approve & Release Credit</button>
-                <button class="btn btn-outline" id="rejectBtn">✗ Reject</button>
-                <button class="btn btn-danger" id="flagBtn">🚩 Flag Account</button>
-              </div>
+                    <dt>File</dt>
+                    <dd id="detail-file" class="muted"></dd>
 
-              <div id="rejectForm" style="display:none; margin-top:20px; padding:20px; background:var(--red-bg); border-radius:8px;">
-                <label style="display:block; margin-bottom:12px;">
-                  <strong style="color:var(--red-ink);">Rejection Reason</strong>
-                </label>
-                <select id="rejectionReason" style="width:100%; margin-bottom:12px;">
-                  <option value="">Select a reason...</option>
-                  <option value="DUPLICATE">Duplicate File</option>
-                  <option value="UNREADABLE">Unreadable / Poor Quality</option>
-                  <option value="INCORRECT">Incorrect / Non-Academic File</option>
-                  <option value="INCOMPLETE">Incomplete Document</option>
-                </select>
-                <div style="display:flex; gap:12px;">
-                  <button class="btn btn-outline" id="confirmRejectBtn">Confirm Reject</button>
-                  <button class="btn btn-outline" id="cancelRejectBtn">Cancel</button>
+                    <dt>Submitted</dt>
+                    <dd id="detail-submitted" class="muted"></dd>
+                  </dl>
+
+                  <h4 style="margin-top:20px;">Re-assign Course (if incorrect)</h4>
+                  <div class="form-group">
+                    <input type="text" id="courseReassign" placeholder="Search course to reassign..." />
+                    <div id="reassignDropdown" class="course-dropdown" style="display:none;"></div>
+                  </div>
+
+                  <h4 style="margin-top:20px;">Actions</h4>
+                  <div class="action-buttons">
+                    <button class="btn btn-success" id="approveBtn">✓ Approve & Release Credit</button>
+                    <button class="btn btn-outline" id="rejectBtn">✗ Reject</button>
+                    <button class="btn btn-danger" id="flagBtn">🚩 Flag Account</button>
+                  </div>
+
+                  <div id="rejectForm" style="display:none; margin-top:20px; padding:20px; background:var(--red-bg); border-radius:8px;">
+                    <label style="display:block; margin-bottom:12px;">
+                      <strong style="color:var(--red-ink);">Rejection Reason</strong>
+                    </label>
+                    <select id="rejectionReason" style="width:100%; margin-bottom:12px;">
+                      <option value="">Select a reason...</option>
+                      <option value="DUPLICATE">Duplicate File</option>
+                      <option value="UNREADABLE">Unreadable / Poor Quality</option>
+                      <option value="INCORRECT">Incorrect / Non-Academic File</option>
+                      <option value="INCOMPLETE">Incomplete Document</option>
+                    </select>
+                    <div style="display:flex; gap:12px;">
+                      <button class="btn btn-outline" id="confirmRejectBtn">Confirm Reject</button>
+                      <button class="btn btn-outline" id="cancelRejectBtn">Cancel</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -183,20 +227,45 @@
       const result = await getPendingSubmissions();
       const allCourses = await getAllCourses();
 
-      if (!result.submissions || result.submissions.length === 0) {
-        content.innerHTML = reviewQueueTemplate([], allCourses.courses || []);
-        return;
-      }
-
       function renderQueue() {
         content.innerHTML = reviewQueueTemplate(result.submissions, allCourses.courses || []);
-        const current = result.submissions[0];
 
-        // Course reassignment search
+        // Table row click handlers
+        document.querySelectorAll(".review-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const idx = parseInt(btn.getAttribute("data-index"));
+            openReviewModal(result.submissions[idx]);
+          });
+        });
+      }
+
+      function openReviewModal(submission) {
+        const modal = document.getElementById("reviewModal");
+        modal.style.display = "flex";
+
+        // Populate details
+        document.getElementById("detail-contributor").textContent = escapeHtml(submission.uploadedBy);
+        document.getElementById("detail-university").textContent = escapeHtml(submission.university);
+        document.getElementById("detail-department").textContent = escapeHtml(submission.department);
+        document.getElementById("detail-course").textContent = `${escapeHtml(submission.courseCode)} - ${escapeHtml(submission.courseTitle)}`;
+        document.getElementById("detail-type").textContent = submission.type;
+        document.getElementById("detail-file").textContent = escapeHtml(submission.fileName);
+        document.getElementById("detail-submitted").textContent = new Date(submission.createdAt).toLocaleDateString();
+
+        // File viewer
+        const fileViewer = document.getElementById("fileViewer");
+        if (submission.fileUrl) {
+          fileViewer.innerHTML = `<iframe src="${submission.fileUrl}#toolbar=0" style="width:100%; height:100%; border:none;"></iframe>`;
+        } else {
+          fileViewer.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--muted);">File not available</div>`;
+        }
+
+        // Course reassignment
         const courseReassign = document.getElementById("courseReassign");
         const reassignDropdown = document.getElementById("reassignDropdown");
+        courseReassign.value = "";
 
-        courseReassign?.addEventListener("input", debounce(() => {
+        courseReassign.addEventListener("input", debounce(() => {
           if (courseReassign.value.length < 2) {
             reassignDropdown.style.display = "none";
             return;
@@ -214,8 +283,8 @@
 
             document.querySelectorAll(".course-option").forEach(opt => {
               opt.addEventListener("click", () => {
-                courseReassign.value = `${opt.textContent}`;
-                document.getElementById("courseId").value = opt.getAttribute("data-id");
+                courseReassign.value = opt.textContent;
+                submission.courseId = opt.getAttribute("data-id");
                 reassignDropdown.style.display = "none";
               });
             });
@@ -223,56 +292,68 @@
         }, 300));
 
         // Action buttons
-        document.getElementById("approveBtn")?.addEventListener("click", async () => {
+        const approveBtn = document.getElementById("approveBtn");
+        const rejectBtn = document.getElementById("rejectBtn");
+        const flagBtn = document.getElementById("flagBtn");
+        const rejectForm = document.getElementById("rejectForm");
+
+        approveBtn.onclick = async () => {
           if (confirm("Approve this submission and release credit?")) {
             try {
-              const reassignedId = document.getElementById("courseId")?.value;
-              await approveSubmission(current.id, reassignedId || current.courseId);
-              showToast("Submission approved and credit released.", false);
-              result.submissions.shift();
+              await approveSubmission(submission.id, submission.courseId);
+              showToast("Submission approved.", false);
+              modal.style.display = "none";
               renderQueue();
             } catch (err) {
               showToast("Error: " + err.message, true);
             }
           }
-        });
+        };
 
-        document.getElementById("rejectBtn")?.addEventListener("click", () => {
-          document.getElementById("rejectForm").style.display = "block";
-        });
+        rejectBtn.onclick = () => {
+          rejectForm.style.display = "block";
+        };
 
-        document.getElementById("cancelRejectBtn")?.addEventListener("click", () => {
-          document.getElementById("rejectForm").style.display = "none";
-        });
+        document.getElementById("cancelRejectBtn").onclick = () => {
+          rejectForm.style.display = "none";
+        };
 
-        document.getElementById("confirmRejectBtn")?.addEventListener("click", async () => {
+        document.getElementById("confirmRejectBtn").onclick = async () => {
           const reason = document.getElementById("rejectionReason").value;
           if (!reason) {
             showToast("Please select a reason.", true);
             return;
           }
           try {
-            await rejectSubmission(current.id, reason);
+            await rejectSubmission(submission.id, reason);
             showToast("Submission rejected.", false);
-            result.submissions.shift();
+            modal.style.display = "none";
             renderQueue();
           } catch (err) {
             showToast("Error: " + err.message, true);
           }
-        });
+        };
 
-        document.getElementById("flagBtn")?.addEventListener("click", async () => {
+        flagBtn.onclick = async () => {
           if (confirm("Flag this account for abuse?")) {
             try {
-              await flagAccount(current.uploadedBy);
+              await flagAccount(submission.uploadedBy);
               showToast("Account flagged.", false);
-              result.submissions.shift();
+              modal.style.display = "none";
               renderQueue();
             } catch (err) {
               showToast("Error: " + err.message, true);
             }
           }
-        });
+        };
+
+        document.getElementById("closeReviewBtn").onclick = () => {
+          modal.style.display = "none";
+        };
+
+        document.querySelector(".modal-overlay").onclick = () => {
+          modal.style.display = "none";
+        };
       }
 
       renderQueue();
